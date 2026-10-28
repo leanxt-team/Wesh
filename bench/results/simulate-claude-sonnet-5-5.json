@@ -1,0 +1,212 @@
+[
+  {
+    "scenario": "quick Q&A",
+    "arm": "no skill",
+    "cost": 0.07856,
+    "delta": 0
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "all 3 installed",
+    "cost": 0.0728795,
+    "delta": -7.2
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "wesh, overhead only",
+    "cost": 0.08210670000000002,
+    "delta": 4.5
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "wesh low",
+    "cost": 0.0792907,
+    "delta": 0.9
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "wesh central",
+    "cost": 0.0659961,
+    "delta": -16
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "wesh high",
+    "cost": 0.0649221,
+    "delta": -17.4
+  },
+  {
+    "scenario": "quick Q&A",
+    "arm": "wesh central + squeeze",
+    "cost": 0.06538769999999999,
+    "delta": -16.8
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "no skill",
+    "cost": 0.58007,
+    "delta": 0
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "all 3 installed",
+    "cost": 0.42463555000000003,
+    "delta": -26.8
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "wesh, overhead only",
+    "cost": 0.5922902,
+    "delta": 2.1
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "wesh low",
+    "cost": 0.5125365999999998,
+    "delta": -11.6
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "wesh central",
+    "cost": 0.3821029499999999,
+    "delta": -34.1
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "wesh high",
+    "cost": 0.3020178499999999,
+    "delta": -47.9
+  },
+  {
+    "scenario": "bug fix",
+    "arm": "wesh central + squeeze",
+    "cost": 0.3528237,
+    "delta": -39.2
+  },
+  {
+    "scenario": "feature",
+    "arm": "no skill",
+    "cost": 2.34285,
+    "delta": 0
+  },
+  {
+    "scenario": "feature",
+    "arm": "all 3 installed",
+    "cost": 1.4891095600000006,
+    "delta": -36.4
+  },
+  {
+    "scenario": "feature",
+    "arm": "wesh, overhead only",
+    "cost": 2.3731473,
+    "delta": 1.3
+  },
+  {
+    "scenario": "feature",
+    "arm": "wesh low",
+    "cost": 1.9325873,
+    "delta": -17.5
+  },
+  {
+    "scenario": "feature",
+    "arm": "wesh central",
+    "cost": 1.3381795899999998,
+    "delta": -42.9
+  },
+  {
+    "scenario": "feature",
+    "arm": "wesh high",
+    "cost": 0.9741572000000001,
+    "delta": -58.4
+  },
+  {
+    "scenario": "feature",
+    "arm": "wesh central + squeeze",
+    "cost": 1.2049456937500003,
+    "delta": -48.6
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "no skill",
+    "cost": 1.67971,
+    "delta": 0
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "all 3 installed",
+    "cost": 1.0567686,
+    "delta": -37.1
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "wesh, overhead only",
+    "cost": 1.6969522000000008,
+    "delta": 1
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "wesh low",
+    "cost": 1.4218630000000008,
+    "delta": -15.4
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "wesh central",
+    "cost": 0.9153689000000004,
+    "delta": -45.5
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "wesh high",
+    "cost": 0.6390536,
+    "delta": -62
+  },
+  {
+    "scenario": "exploration-heavy",
+    "arm": "wesh central + squeeze",
+    "cost": 0.8131328375,
+    "delta": -51.6
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "no skill",
+    "cost": 17.182965,
+    "delta": 0
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "all 3 installed",
+    "cost": 10.22858873,
+    "delta": -40.5
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "wesh, overhead only",
+    "cost": 17.32918239999997,
+    "delta": 0.9
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "wesh low",
+    "cost": 13.87043739999997,
+    "delta": -19.3
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "wesh central",
+    "cost": 9.100133470000001,
+    "delta": -47
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "wesh high",
+    "cost": 6.210136899999995,
+    "delta": -63.9
+  },
+  {
+    "scenario": "long session (stress)",
+    "arm": "wesh central + squeeze",
+    "cost": 7.9790043699999895,
+    "delta": -53.6
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "tokenizer": "approx chars/3.8 (run `npm i` in bench/ for o200k)",
+  "arms": [
+    {
+      "name": "wesh",
+      "skills": 10,
+      "listed": 6,
+      "alwaysOn": 986,
+      "listing": 444,
+      "perTurn": 1430,
+      "avgLoad": 570,
+      "maxLoad": 1096
+    }
+  ]
+}

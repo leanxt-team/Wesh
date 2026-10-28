@@ -1,0 +1,30 @@
+wesh
+Copyright 2026 Vincent Croise. Licensed under the MIT License (see LICENSE).
+
+wesh is a derivative work that condenses, merges and rewrites material from:
+
+- caveman, Copyright 2026 Julius Brussee, Apache License 2.0
+  https://github.com/JuliusBrussee/caveman
+  Used: caveman/ultracave voice rules, caveman-commit, caveman-review format,
+  caveman-compress approach, caveman-explore/cavecrew-investigator (wesh-scout),
+  native-core, lean-build, investigate-first, surgical-patch, safe-refactor,
+  verify-and-stop, migration. All text was rewritten and shortened; no code copied.
+
+- ponytail, Copyright 2026 Dietrich Gebert, MIT License
+  https://github.com/dietrichgebert/ponytail
+  Used: ponytail core rules, ponytail-review, ponytail-audit, ponytail-debt
+  (shortcut: comment convention), benchmark figures cited in README.
+
+- skills, Copyright 2026 Matt Pocock, MIT License
+  https://github.com/mattpocock/skills
+  Used: diagnosing-bugs, tdd (+ mocking), code-review (spec axis, smells),
+  grilling, to-spec, handoff.
+
+Optional integration (no code copied; wesh writes config pointing at the separately installed tool):
+
+- codegraph, Copyright Colby McHenry, MIT License
+  https://github.com/colbymchenry/codegraph
+  Installed only with `--codegraph` (npm package @colbymchenry/codegraph@1.6.2) and used as an MCP server.
+
+The MIT and Apache-2.0 license texts of the upstream projects apply to the
+portions derived from them.

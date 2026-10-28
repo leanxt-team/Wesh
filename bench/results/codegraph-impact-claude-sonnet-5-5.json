@@ -1,0 +1,26 @@
+[
+  {
+    "project": "short project",
+    "wesh": 0.70144,
+    "weshCodegraph": 0.634975,
+    "delta": -9.475507527372262
+  },
+  {
+    "project": "long project",
+    "wesh": 14.10743,
+    "weshCodegraph": 11.497774999999999,
+    "delta": -18.498443727879575
+  },
+  {
+    "project": "very long project",
+    "wesh": 196.18099999999998,
+    "weshCodegraph": 74.9879,
+    "delta": -61.77616588762418
+  },
+  {
+    "project": "very long, half the exploration",
+    "wesh": 106.7078,
+    "weshCodegraph": 58.7645,
+    "delta": -44.92951780469657
+  }
+]

@@ -1,0 +1,40 @@
+# The shipped checks on every OS and Node version wesh supports. Everything here is local: the codegraph CLI and the
+# agent hosts are replaced by fakes, no model is called, nothing is installed globally.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false # a failure on one OS must not hide the others
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Reliability, squeeze and auto-index suites (108 tests). No npm install: the suites need no dependency.
+      - name: Unit tests
+        working-directory: bench
+        run: npm test
+
+      # Every A/B hidden check fails on the untouched fixture and passes on a reference fix.
+      - name: A/B selftest
+        run: node bench/ab/run.mjs --selftest

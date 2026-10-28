@@ -1,0 +1,12 @@
+{
+  "name": "wesh-bench",
+  "private": true,
+  "type": "module",
+  "optionalDependencies": { "js-tiktoken": "1.0.21" },
+  "scripts": {
+    "static": "node static.mjs",
+    "simulate": "node simulate.mjs",
+    "test": "node --test reliability.test.mjs squeeze-p0.test.mjs autoindex-p0.test.mjs",
+    "live": "node live.mjs"
+  }
+}
