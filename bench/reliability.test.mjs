@@ -525,14 +525,14 @@ test('uninstall still works after the home folder moved (state is not keyed by a
 });
 
 // codegraph: a fake CLI records its calls, so these tests never download or run the real one.
-function fakeCodegraph({ build = true } = {}) { // init creates .codegraph/ (unless build: false); uninit --force <dir> removes it
+function fakeCodegraph({ build = true, syncFails = false } = {}) { // init creates .codegraph/ (unless build: false); uninit --force <dir> removes it
   const dir = tmp(), logf = path.join(dir, 'calls.log');
   const bin = process.platform === 'win32' ? path.join(dir, 'codegraph.cmd') : path.join(dir, 'codegraph');
   const status = 'if [ "$1" = "status" ]; then if [ -d .codegraph ]; then echo \'{"initialized":true,"lastIndexed":"2026-01-01T00:00:00.000Z","fileCount":1,"pendingChanges":{"added":0,"modified":0,"removed":0},"index":{"state":"complete"}}\'; else echo \'{"initialized":false,"lastIndexed":null}\'; fi; exit 0; fi';
   const telemetry = 'if [ "$1" = "telemetry" ] && [ "$2" = "status" ]; then echo "Telemetry: enabled (your saved choice)"; exit 0; fi';
   fs.writeFileSync(bin, process.platform === 'win32'
-    ? `@echo off\r\necho %*>> "${logf}"\r\nif "%1"=="--version" echo 1.6.2\r\n${build ? 'if "%1"=="init" mkdir .codegraph\r\n' : 'if "%1"=="init" ping -n 4 127.0.0.1 >nul\r\n'}if "%1"=="uninit" rmdir /s /q "%~3\\.codegraph"\r\nif "%1"=="status" (if exist .codegraph (echo {"initialized":true,"lastIndexed":"2026-01-01T00:00:00.000Z","fileCount":1,"pendingChanges":{"added":0,"modified":0,"removed":0},"index":{"state":"complete"}}) else (echo {"initialized":false,"lastIndexed":null}))\r\nif "%1"=="telemetry" if "%2"=="status" echo Telemetry: enabled\r\nexit /b 0\r\n`
-    : `#!/bin/sh\necho "$*" >> "${logf}"\n[ "$1" = "--version" ] && echo 1.6.2\n${build ? '[ "$1" = "init" ] && mkdir .codegraph\n' : '[ "$1" = "init" ] && sleep 3\n'}[ "$1" = "uninit" ] && rm -rf "$3/.codegraph"\n${status}\n${telemetry}\nexit 0\n`, { mode: 0o755 });
+    ? `@echo off\r\necho %*>> "${logf}"\r\nif "%1"=="--version" echo 1.6.2\r\n${build ? 'if "%1"=="init" mkdir .codegraph\r\n' : 'if "%1"=="init" ping -n 4 127.0.0.1 >nul\r\n'}if "%1"=="uninit" rmdir /s /q "%~3\\.codegraph"\r\nif "%1"=="status" (if exist .codegraph (echo {"initialized":true,"lastIndexed":"2026-01-01T00:00:00.000Z","fileCount":1,"pendingChanges":{"added":0,"modified":0,"removed":0},"index":{"state":"complete"}}) else (echo {"initialized":false,"lastIndexed":null}))\r\nif "%1"=="telemetry" if "%2"=="status" echo Telemetry: enabled\r\n${syncFails ? 'if "%1"=="sync" exit /b 1\r\n' : ''}exit /b 0\r\n`
+    : `#!/bin/sh\necho "$*" >> "${logf}"\n[ "$1" = "--version" ] && echo 1.6.2\n${build ? '[ "$1" = "init" ] && mkdir .codegraph\n' : '[ "$1" = "init" ] && sleep 3\n'}[ "$1" = "uninit" ] && rm -rf "$3/.codegraph"\n${status}\n${telemetry}\n${syncFails ? '[ "$1" = "sync" ] && exit 1\n' : ''}exit 0\n`, { mode: 0o755 });
   return { dir, bin, calls: () => (fs.existsSync(logf) ? read(logf) : '') };
 }
 const waitFor = async (f, ms = 15000) => { const t = Date.now(); while (!f()) { if (Date.now() - t > ms) return false; await new Promise(r => setTimeout(r, 100)); } return true; };
@@ -738,6 +738,134 @@ test('project scope: your own codegraph.json entries survive install and uninsta
   const back = JSON.parse(read(file));
   assert.deepEqual(back.exclude, ['vendor/**'], 'only wesh\'s entries go');
   assert.deepEqual(back.extensions, { '.foo': 'foo' }, 'your file stays');
+});
+
+const CLAUDE_EXCLUDES = ['.claude/wesh/**'];
+const OPENCODE_EXCLUDES = ['.opencode/wesh/**', '.opencode/plugins/wesh-*.js'];
+const projectArgs = (home, proj, cg, ...more) => ['--home', home, '--scope', 'project', '--project', proj, '--codegraph-cli', cg.bin, '--opencode-version', '2', ...more];
+const cgLedger = (proj, host) => JSON.parse(read(path.join(proj, host, 'wesh', 'state.json'))).files['codegraph.json'];
+const excludes = proj => JSON.parse(read(path.join(proj, 'codegraph.json'))).exclude;
+
+test('project scope: uninstalling Claude Code keeps OpenCode\'s codegraph excludes', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(projectArgs(home, proj, cg));
+  run(projectArgs(home, proj, cg, '--target', 'claude', '--uninstall'));
+  assert.deepEqual(excludes(proj), OPENCODE_EXCLUDES);
+  assert.ok(fs.existsSync(path.join(proj, '.opencode', 'wesh')) && fs.existsSync(path.join(proj, '.opencode', 'plugins', 'wesh-codegraph.js')));
+  assert.ok(!fs.existsSync(path.join(proj, 'codegraph.json.wesh-bak')), 'wesh\'s own file is never backed up');
+  run(projectArgs(home, proj, cg, '--target', 'opencode', '--uninstall'));
+  assert.deepEqual(fs.readdirSync(proj), [], 'the last uninstall removes the file wesh made');
+});
+
+test('project scope: OpenCode then Claude Code, uninstall OpenCode: Claude Code\'s exclude stays', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(projectArgs(home, proj, cg, '--target', 'opencode'));
+  run(projectArgs(home, proj, cg, '--target', 'claude'));
+  run(projectArgs(home, proj, cg, '--target', 'opencode', '--uninstall'));
+  assert.deepEqual(excludes(proj), CLAUDE_EXCLUDES);
+  run(projectArgs(home, proj, cg, '--target', 'claude', '--uninstall'));
+  assert.deepEqual(fs.readdirSync(proj), [], 'the last uninstall removes the file wesh made');
+});
+
+test('project scope: a shared exclude ledger from an older wesh is split by owner on reinstall', () => {
+  // 0939002 recorded all three entries under the target that installed first, and nothing under the other.
+  const legacy = (proj, owner, other) => {
+    for (const [host, fsx] of [[owner, { created: true, containers: ['exclude'], added: { exclude: [...CLAUDE_EXCLUDES, ...OPENCODE_EXCLUDES] } }],
+      [other, { created: false, containers: [], added: {} }]]) {
+      const f = path.join(proj, host, 'wesh', 'state.json'), st = JSON.parse(read(f));
+      st.files['codegraph.json'] = fsx;
+      fs.writeFileSync(f, JSON.stringify(st, null, 2) + '\n');
+    }
+  };
+  for (const [first, owner, other, drop, keep] of [['both', '.claude', '.opencode', 'claude', OPENCODE_EXCLUDES], ['opencode', '.opencode', '.claude', 'opencode', CLAUDE_EXCLUDES]]) {
+    const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+    if (first === 'both') run(projectArgs(home, proj, cg));
+    else { run(projectArgs(home, proj, cg, '--target', 'opencode')); run(projectArgs(home, proj, cg, '--target', 'claude')); }
+    legacy(proj, owner, other);
+    run(projectArgs(home, proj, cg));
+    assert.deepEqual(cgLedger(proj, '.claude').added.exclude, CLAUDE_EXCLUDES, `${first}: Claude Code owns its own`);
+    assert.deepEqual(cgLedger(proj, '.opencode').added.exclude, OPENCODE_EXCLUDES, `${first}: OpenCode owns its own`);
+    run(projectArgs(home, proj, cg, '--target', drop, '--uninstall'));
+    assert.deepEqual(excludes(proj), keep, `${first}: uninstall ${drop} keeps the other's`);
+    run(projectArgs(home, proj, cg, '--target', drop === 'claude' ? 'opencode' : 'claude', '--uninstall'));
+    assert.deepEqual(fs.readdirSync(proj), [], `${first}: nothing left`);
+  }
+});
+
+test('project scope: an older shared ledger is split even by an uninstall without a reinstall', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(projectArgs(home, proj, cg));
+  const f = path.join(proj, '.claude', 'wesh', 'state.json'), st = JSON.parse(read(f));
+  st.files['codegraph.json'].added.exclude = [...CLAUDE_EXCLUDES, ...OPENCODE_EXCLUDES];
+  fs.writeFileSync(f, JSON.stringify(st, null, 2) + '\n');
+  const o = path.join(proj, '.opencode', 'wesh', 'state.json'), sto = JSON.parse(read(o));
+  sto.files['codegraph.json'] = { created: false, containers: [], added: {} };
+  fs.writeFileSync(o, JSON.stringify(sto, null, 2) + '\n');
+  run(projectArgs(home, proj, cg, '--target', 'claude', '--uninstall'));
+  assert.deepEqual(excludes(proj), OPENCODE_EXCLUDES);
+  run(projectArgs(home, proj, cg, '--target', 'opencode', '--uninstall'));
+  assert.deepEqual(fs.readdirSync(proj), []);
+});
+
+test('project scope: an older shared ledger, one target reinstalled, the other uninstalled without a reinstall', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(projectArgs(home, proj, cg));
+  const f = path.join(proj, '.claude', 'wesh', 'state.json'), st = JSON.parse(read(f));
+  st.files['codegraph.json'].added.exclude = [...CLAUDE_EXCLUDES, ...OPENCODE_EXCLUDES];
+  fs.writeFileSync(f, JSON.stringify(st, null, 2) + '\n');
+  const o = path.join(proj, '.opencode', 'wesh', 'state.json'), sto = JSON.parse(read(o));
+  sto.files['codegraph.json'] = { created: false, containers: [], added: {} };
+  fs.writeFileSync(o, JSON.stringify(sto, null, 2) + '\n');
+  const optionsBefore = JSON.parse(read(o)).options;
+  run(projectArgs(home, proj, cg, '--target', 'claude'));
+  assert.deepEqual(cgLedger(proj, '.claude').added.exclude, CLAUDE_EXCLUDES);
+  assert.deepEqual(cgLedger(proj, '.opencode').added.exclude, OPENCODE_EXCLUDES, 'handed to OpenCode, which stays installed');
+  assert.deepEqual(JSON.parse(read(o)).options, optionsBefore, 'only the codegraph.json record of OpenCode\'s state is written');
+  run(projectArgs(home, proj, cg, '--target', 'opencode', '--uninstall'));
+  assert.deepEqual(excludes(proj), CLAUDE_EXCLUDES);
+  run(projectArgs(home, proj, cg, '--target', 'claude', '--uninstall'));
+  assert.deepEqual(fs.readdirSync(proj), []);
+});
+
+test('project scope: an older single-target install drops the other target\'s orphan excludes', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(projectArgs(home, proj, cg, '--target', 'claude'));
+  const file = path.join(proj, 'codegraph.json');
+  fs.writeFileSync(file, JSON.stringify({ exclude: [...CLAUDE_EXCLUDES, ...OPENCODE_EXCLUDES] }, null, 2) + '\n');
+  const f = path.join(proj, '.claude', 'wesh', 'state.json'), st = JSON.parse(read(f));
+  st.files['codegraph.json'].added.exclude = [...CLAUDE_EXCLUDES, ...OPENCODE_EXCLUDES];
+  fs.writeFileSync(f, JSON.stringify(st, null, 2) + '\n');
+  run(projectArgs(home, proj, cg, '--target', 'claude'));
+  assert.deepEqual(excludes(proj), CLAUDE_EXCLUDES);
+  run(projectArgs(home, proj, cg, '--target', 'claude', '--uninstall'));
+  assert.deepEqual(fs.readdirSync(proj), []);
+});
+
+test('project scope: an existing index is synced once when the excludes are added', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  fs.mkdirSync(path.join(proj, '.codegraph'));
+  run(projectArgs(home, proj, cg));
+  const syncs = () => cg.calls().split(/\r?\n/).filter(l => /^sync\b/.test(l));
+  assert.deepEqual(syncs(), [`sync --quiet ${proj}`], 'one sync for both targets');
+  run(projectArgs(home, proj, cg));
+  assert.equal(syncs().length, 1, 'nothing added: no second sync');
+  const fresh = tmp(), cg2 = fakeCodegraph();
+  run(projectArgs(tmp(), fresh, cg2));
+  assert.doesNotMatch(cg2.calls(), /^sync/m, 'no index yet: nothing to sync');
+  const dry = tmp(), cg3 = fakeCodegraph();
+  fs.mkdirSync(path.join(dry, '.codegraph'));
+  run(projectArgs(tmp(), dry, cg3, '--dry-run'));
+  assert.doesNotMatch(cg3.calls(), /^sync/m, 'dry run: no sync');
+});
+
+test('project scope: a failing sync never fails the install, and says what to run', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph({ syncFails: true });
+  fs.mkdirSync(path.join(proj, '.codegraph'));
+  const out = run(projectArgs(home, proj, cg));
+  assert.match(cg.calls(), /^sync --quiet/m);
+  const hints = out.split('\n').filter(l => /codegraph sync/.test(l));
+  assert.deepEqual(hints, [`  codegraph: run \`codegraph sync\` in ${proj} to drop wesh's files from the index`]);
+  assert.ok(fs.existsSync(path.join(proj, '.claude', 'wesh', 'state.json')) && fs.existsSync(path.join(proj, '.opencode', 'wesh', 'state.json')));
 });
 
 test('parallel squeezes always save the full output (no race)', () => {

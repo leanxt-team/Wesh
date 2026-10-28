@@ -33,7 +33,8 @@ const USER_ONLY = ['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh
 // Skills wesh shipped under a name it no longer uses: the new install takes the old ones away.
 const RETIRED = ['wesh', 'wesh-compress'];
 // wesh's own files in a project: they are not the project's code, so the code graph must not index them.
-const PROJECT_EXCLUDES = ['.claude/wesh/**', '.opencode/wesh/**', '.opencode/plugins/wesh-*.js'];
+// Each target owns the entries for the files it puts there: removing one target never takes the other's away.
+const PROJECT_EXCLUDES = { claude: ['.claude/wesh/**'], opencode: ['.opencode/wesh/**', '.opencode/plugins/wesh-*.js'] };
 const GUARD_CLAUDE = ['Bash(git push:*)', 'Bash(git reset --hard:*)', 'Bash(git clean:*)', 'Bash(git branch -D:*)',
   'Bash(git checkout -- .:*)', 'Bash(git restore .:*)', 'Bash(rm -rf:*)'];
 const GUARD_OPENCODE = ['git push*', 'git reset --hard*', 'git clean*', 'git branch -D*', 'git checkout -- .*',
@@ -404,23 +405,66 @@ function unwireOpencodeCodegraph(p, st) {
 }
 // The project's codegraph.json (project scope): wesh's own files stay out of the index. The user's own entries stay.
 // Not to be confused with wesh's CLI config (ocWesh/claudeWesh/codegraph.json), which says which codegraph to run.
-function excludeWeshFiles(p, st) {
-  if (!p.projectCodegraph) return;
+// list: this target's entries. other: the state of the other target when it is (or is being) installed.
+// Returns how many entries it added, and whether it handed entries to the other target's state.
+function excludeWeshFiles(p, st, list, other) {
+  if (!p.projectCodegraph) return { added: 0, handed: false };
+  let added = 0, handed = false;
   editJson(p.projectCodegraph, st, (c, fsx) => {
-    const list = ensure(c, ['exclude'], 'array', fsx);
-    for (const e of PROJECT_EXCLUDES) if (!list.includes(e)) { list.push(e); addTo(fsx, 'exclude', e); }
-  }, `  "exclude": ${JSON.stringify(PROJECT_EXCLUDES)}`);
+    // A file the other target's install made is wesh's file for this target too (no backup, removed once empty).
+    const ofx = other?.files?.[path.basename(p.projectCodegraph)];
+    if (ofx?.created) { fsx.created = true; fsx.containers = [...new Set([...fsx.containers, ...ofx.containers])]; }
+    const ex = ensure(c, ['exclude'], 'array', fsx);
+    // An older wesh recorded every entry under the target that installed first. The other target's entries move to
+    // its record; when that target is not installed nobody will claim them, so they leave the file instead.
+    const mine = fsx.added.exclude || [];
+    const theirs = mine.filter(e => !list.includes(e));
+    if (!other) c.exclude = ex.filter(e => !theirs.includes(e));
+    else if (theirs.length) {
+      const o = fileState(other, p.projectCodegraph);
+      for (const e of theirs) addTo(o, 'exclude', e);
+      o.created ||= fsx.created;
+      o.containers = [...new Set([...o.containers, ...fsx.containers])];
+      handed = true;
+    }
+    if (theirs.length) fsx.added.exclude = mine.filter(e => list.includes(e));
+    // An entry of this target's already in the file was put there for it (by an older wesh): it is this target's.
+    for (const e of list) {
+      if (!c.exclude.includes(e)) { c.exclude.push(e); added++; }
+      addTo(fsx, 'exclude', e);
+    }
+  }, `  "exclude": ${JSON.stringify(list)}`);
+  return { added, handed };
 }
-// Uninstall: only the entries wesh added go. The file stays unless wesh made it and nothing else is left in it.
-function unexcludeWeshFiles(p, st) {
-  if (!p.projectCodegraph) return;
+// Uninstall: only this target's entries go. The file stays unless wesh made it and nothing else is left in it.
+// other: the state of the target that stays installed, if any. What is left is handed to it, so its own uninstall
+// still removes the file wesh made.
+function unexcludeWeshFiles(p, st, list, other) {
+  if (!p.projectCodegraph || !fs.existsSync(p.projectCodegraph)) return false;
+  let handed = false;
   editJson(p.projectCodegraph, st, (c, fsx) => {
     const added = (fsx.added ||= {})['exclude'] || [];
-    if (!added.length) return;
-    if (Array.isArray(c.exclude)) c.exclude = c.exclude.filter(e => !added.includes(e));
+    // An older wesh's record may hold the other target's entries too: they stay while that target is installed.
+    const gone = other ? added.filter(e => list.includes(e)) : added;
+    if (Array.isArray(c.exclude)) c.exclude = c.exclude.filter(e => !gone.includes(e));
     fsx.added['exclude'] = [];
     dropEmptyContainers(c, fsx);
+    if (!other || !Object.keys(c).length || !(added.length > gone.length || fsx.created || fsx.containers.length)) return;
+    const ofx = fileState(other, p.projectCodegraph);
+    for (const e of added) if (!gone.includes(e)) addTo(ofx, 'exclude', e);
+    ofx.created ||= fsx.created;
+    ofx.containers = [...new Set([...ofx.containers, ...fsx.containers])];
+    handed = true;
   }, '');
+  return handed;
+}
+// A run that leaves the other target installed writes back only the codegraph.json record it handed over.
+function saveHandover(dir, st, file) {
+  if (DRY) return;
+  const disk = loadState(dir);
+  fileState(disk, file); // folds a legacy key into the file name first
+  disk.files[path.basename(file)] = fileState(st, file);
+  saveState(dir, disk);
 }
 function removeCodegraphCli(states) {
   if (!states.some(s => s.codegraphCliInstalled) || DRY) return;
@@ -620,6 +664,9 @@ function install(o, p) {
   const wantGuard = o.guard ?? savedGuard ?? false;
   for (const st of [stC, stO]) st.options = { ...st.options, squeeze: wantSqueeze, guard: wantGuard };
   retireSkills(p, stC, stO);
+  // Project scope: entries this install adds to the project's codegraph.json (an existing index is synced once below).
+  const other = (dir, st) => (o.target === 'both' || fs.existsSync(path.join(dir, 'state.json')) ? st : null);
+  let excluded = 0;
   // The names this install put on disk: uninstall removes them even if a later wesh renames them.
   for (const st of [stC, stO]) st.options = { ...st.options, skills: [...new Set([...(st.options?.skills || []), ...skillNames()])] };
   if (o.target !== 'opencode') {
@@ -630,7 +677,13 @@ function install(o, p) {
     write(path.join(p.claudeAgents, 'wesh-scout.md'), scoutForClaude(!!cg));
     log(`  agent wesh-scout -> ${p.claudeAgents}`);
     upsertBlock(p.claudeRules, coreBlock(o.level, !!cg, fs.existsSync(p.claudeRules) && fs.readFileSync(p.claudeRules, 'utf8').includes('CODEGRAPH_START')), st);
-    if (cg) { wireClaudeCodegraph(p, st, cg.cmd); excludeWeshFiles(p, st); log(`  codegraph MCP server -> ${p.claudeMcp}`); } else unwireClaudeCodegraph(p, st);
+    if (cg) {
+      wireClaudeCodegraph(p, st, cg.cmd);
+      const r = excludeWeshFiles(p, st, PROJECT_EXCLUDES.claude, other(p.ocWesh, stO));
+      excluded += r.added;
+      if (r.handed && o.target === 'claude') saveHandover(p.ocWesh, stO, p.projectCodegraph);
+      log(`  codegraph MCP server -> ${p.claudeMcp}`);
+    } else unwireClaudeCodegraph(p, st);
     if (wantSqueeze) {
       for (const f of ['squeeze.mjs', 'claude-squeeze.mjs']) write(path.join(p.claudeWesh, f), srcText('hooks', f));
       editJson(p.claudeSettings, st, (s, fsx) => {
@@ -701,7 +754,9 @@ function install(o, p) {
     if (cg) {
       const major = opencodeMajor(o, p);
       wireOpencodeCodegraph(p, st, cg.cmd, major, schema);
-      excludeWeshFiles(p, st);
+      const r = excludeWeshFiles(p, st, PROJECT_EXCLUDES.opencode, other(p.claudeWesh, stC));
+      excluded += r.added;
+      if (r.handed && o.target === 'opencode') saveHandover(p.claudeWesh, stC, p.projectCodegraph);
       log(`  codegraph MCP server -> ${p.ocConfig} (OpenCode ${major} format)`);
     } else unwireOpencodeCodegraph(p, st);
     if (wantGuard) editJson(p.ocConfig, st, (c, fsx) => {
@@ -712,6 +767,12 @@ function install(o, p) {
     }, `  "permission": { "bash": { ${GUARD_OPENCODE.map(g => `"${g}": "ask"`).join(', ')} } }`);
     else { unwireOpencodeGuard(p, st); log('  git guard rules removed (--no-guard)'); }
     saveState(p.ocWesh, st);
+  }
+  // An index built before the excludes still holds wesh's files, and `codegraph status` shows no pending change for
+  // them: sync once now, or the auto-index never drops them.
+  if (cg && excluded && !DRY && fs.existsSync(path.join(o.project, '.codegraph'))) {
+    const r = run(cg.cmd, ['sync', '--quiet', o.project]);
+    if (r.status !== 0) log(`  codegraph: run \`codegraph sync\` in ${o.project} to drop wesh's files from the index`);
   }
   log(`\nDone. Restart Claude Code / OpenCode / OpenChamber. Level: ${o.level}. Try /wesh-level help.`);
   if (cg) log('codegraph: on. Each project gets its code graph automatically the first time a session opens it (set WESH_AUTOINDEX=0 to stop that).');
@@ -729,7 +790,9 @@ function uninstall(o, p) {
     remove(path.join(p.claudeAgents, 'wesh-scout.md'));
     stripBlock(p.claudeRules, st);
     unwireClaudeCodegraph(p, st);
-    unexcludeWeshFiles(p, st);
+    // --target claude with OpenCode staying: its state keeps what is left in the project's codegraph.json.
+    const ocStays = o.target === 'claude' && fs.existsSync(path.join(p.ocWesh, 'state.json'));
+    if (unexcludeWeshFiles(p, st, PROJECT_EXCLUDES.claude, o.target === 'both' || ocStays ? stO : null) && ocStays) saveHandover(p.ocWesh, stO, p.projectCodegraph);
     if (fs.existsSync(p.claudeSettings)) editJson(p.claudeSettings, st, (s, fsx) => {
       const ask = fsx.added['permissions.ask'] || [];
       if (Array.isArray(s.permissions?.ask)) s.permissions.ask = s.permissions.ask.filter(r => !ask.includes(r));
@@ -741,7 +804,8 @@ function uninstall(o, p) {
   if (o.target !== 'claude') {
     const st = stO;
     unwireOpencodeCodegraph(p, st);
-    unexcludeWeshFiles(p, st);
+    const claudeStays = o.target === 'opencode' && fs.existsSync(path.join(p.claudeWesh, 'state.json'));
+    if (unexcludeWeshFiles(p, st, PROJECT_EXCLUDES.opencode, claudeStays ? stC : null)) saveHandover(p.claudeWesh, stC, p.projectCodegraph);
     for (const n of all(st)) remove(path.join(p.ocSkills, n));
     remove(path.join(p.ocAgents, 'wesh-scout.md'));
     for (const n of USER_ONLY) remove(path.join(p.ocCommands, `${n}.md`));
