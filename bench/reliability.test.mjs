@@ -710,6 +710,36 @@ test('project scope: codegraph goes to .mcp.json and leaves no trace after unins
   assert.deepEqual(fs.readdirSync(proj), []);
 });
 
+test('project scope: wesh\'s own files stay out of the code graph', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  run(['--home', home, '--scope', 'project', '--project', proj, '--codegraph-cli', cg.bin, '--opencode-version', '2']);
+  const cfg = JSON.parse(read(path.join(proj, 'codegraph.json')));
+  for (const e of ['.claude/wesh/**', '.opencode/wesh/**', '.opencode/plugins/wesh-*.js']) assert.ok(cfg.exclude.includes(e), e);
+});
+
+test('project scope: a second install adds no duplicate excludes', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  const args = ['--home', home, '--scope', 'project', '--project', proj, '--codegraph-cli', cg.bin, '--opencode-version', '2'];
+  run(args);
+  run(args);
+  const cfg = JSON.parse(read(path.join(proj, 'codegraph.json')));
+  assert.deepEqual(cfg.exclude, ['.claude/wesh/**', '.opencode/wesh/**', '.opencode/plugins/wesh-*.js']);
+});
+
+test('project scope: your own codegraph.json entries survive install and uninstall', () => {
+  const home = tmp(), proj = tmp(), cg = fakeCodegraph();
+  const file = path.join(proj, 'codegraph.json');
+  fs.writeFileSync(file, JSON.stringify({ exclude: ['vendor/**'], extensions: { '.foo': 'foo' } }, null, 2));
+  run(['--home', home, '--scope', 'project', '--project', proj, '--codegraph-cli', cg.bin, '--opencode-version', '2']);
+  const after = JSON.parse(read(file));
+  assert.ok(after.exclude.includes('vendor/**'), 'your exclude stays');
+  assert.deepEqual(after.extensions, { '.foo': 'foo' }, 'your extensions stay');
+  run(['--home', home, '--scope', 'project', '--project', proj, '--uninstall']);
+  const back = JSON.parse(read(file));
+  assert.deepEqual(back.exclude, ['vendor/**'], 'only wesh\'s entries go');
+  assert.deepEqual(back.extensions, { '.foo': 'foo' }, 'your file stays');
+});
+
 test('parallel squeezes always save the full output (no race)', () => {
   const dir = tmp();
   const script = path.join(dir, 'p.mjs');

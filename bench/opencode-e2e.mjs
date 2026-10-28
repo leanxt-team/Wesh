@@ -114,7 +114,7 @@ server.close();
 
 const main = seen.find(s => s.tools.some(t => t === 'bash' || t === 'shell') && !s.result.trim()) || {};
 const last = seen.filter(s => s.allResults?.length).at(-1) || {};
-const after = { result: (last.allResults || []).find(r => /squeeze|PASS src|FAIL src/.test(r)) || last.result || '' };
+const after = { result: (last.allResults || []).find(r => /> node gen\.js/.test(r)) || (last.allResults || []).find(r => /squeeze|PASS src|FAIL src/.test(r)) || last.result || '' };
 fs.writeFileSync(path.join(sb, 'first-request.json'), JSON.stringify(main.raw ?? null, null, 2)); // for inspection
 fs.writeFileSync(path.join(sb, 'last-request.json'), JSON.stringify(seen.at(-1)?.raw ?? null, null, 2)); // the MCP server is connected by now
 fs.writeFileSync(path.join(sb, 'requests.json'), JSON.stringify(seen.map(s => ({ tools: s.tools, results: (s.allResults || []).map(r => r.slice(0, 200)) })), null, 2));

@@ -32,6 +32,8 @@ const END = '<!-- wesh:end -->';
 const USER_ONLY = ['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt'];
 // Skills wesh shipped under a name it no longer uses: the new install takes the old ones away.
 const RETIRED = ['wesh', 'wesh-compress'];
+// wesh's own files in a project: they are not the project's code, so the code graph must not index them.
+const PROJECT_EXCLUDES = ['.claude/wesh/**', '.opencode/wesh/**', '.opencode/plugins/wesh-*.js'];
 const GUARD_CLAUDE = ['Bash(git push:*)', 'Bash(git reset --hard:*)', 'Bash(git clean:*)', 'Bash(git branch -D:*)',
   'Bash(git checkout -- .:*)', 'Bash(git restore .:*)', 'Bash(rm -rf:*)'];
 const GUARD_OPENCODE = ['git push*', 'git reset --hard*', 'git clean*', 'git branch -D*', 'git checkout -- .*',
@@ -97,6 +99,8 @@ function paths(o) {
     ocConfig: jsonOrJsonc(user ? path.join(oc, 'opencode.json') : path.join(o.project, 'opencode.json')),
     ocPlugin: path.join(oc, 'plugins', 'wesh-squeeze.js'),
     ocCgPlugin: path.join(oc, 'plugins', 'wesh-codegraph.js'),
+    // Project scope: the code graph's own config in the project root (not wesh's CLI config in ocWesh/claudeWesh).
+    projectCodegraph: user ? '' : path.join(o.project, 'codegraph.json'),
     autoindexHook: hookEntry(user, claude, 'claude-autoindex.mjs', 30),
   };
 }
@@ -398,6 +402,26 @@ function unwireOpencodeCodegraph(p, st) {
   remove(p.ocCgPlugin);
   for (const f of [...AUTOINDEX_FILES, 'codegraph.json']) remove(path.join(p.ocWesh, f));
 }
+// The project's codegraph.json (project scope): wesh's own files stay out of the index. The user's own entries stay.
+// Not to be confused with wesh's CLI config (ocWesh/claudeWesh/codegraph.json), which says which codegraph to run.
+function excludeWeshFiles(p, st) {
+  if (!p.projectCodegraph) return;
+  editJson(p.projectCodegraph, st, (c, fsx) => {
+    const list = ensure(c, ['exclude'], 'array', fsx);
+    for (const e of PROJECT_EXCLUDES) if (!list.includes(e)) { list.push(e); addTo(fsx, 'exclude', e); }
+  }, `  "exclude": ${JSON.stringify(PROJECT_EXCLUDES)}`);
+}
+// Uninstall: only the entries wesh added go. The file stays unless wesh made it and nothing else is left in it.
+function unexcludeWeshFiles(p, st) {
+  if (!p.projectCodegraph) return;
+  editJson(p.projectCodegraph, st, (c, fsx) => {
+    const added = (fsx.added ||= {})['exclude'] || [];
+    if (!added.length) return;
+    if (Array.isArray(c.exclude)) c.exclude = c.exclude.filter(e => !added.includes(e));
+    fsx.added['exclude'] = [];
+    dropEmptyContainers(c, fsx);
+  }, '');
+}
 function removeCodegraphCli(states) {
   if (!states.some(s => s.codegraphCliInstalled) || DRY) return;
   // Only take away the exact version wesh installed: an upgraded CLI is the user's now.
@@ -606,7 +630,7 @@ function install(o, p) {
     write(path.join(p.claudeAgents, 'wesh-scout.md'), scoutForClaude(!!cg));
     log(`  agent wesh-scout -> ${p.claudeAgents}`);
     upsertBlock(p.claudeRules, coreBlock(o.level, !!cg, fs.existsSync(p.claudeRules) && fs.readFileSync(p.claudeRules, 'utf8').includes('CODEGRAPH_START')), st);
-    if (cg) { wireClaudeCodegraph(p, st, cg.cmd); log(`  codegraph MCP server -> ${p.claudeMcp}`); } else unwireClaudeCodegraph(p, st);
+    if (cg) { wireClaudeCodegraph(p, st, cg.cmd); excludeWeshFiles(p, st); log(`  codegraph MCP server -> ${p.claudeMcp}`); } else unwireClaudeCodegraph(p, st);
     if (wantSqueeze) {
       for (const f of ['squeeze.mjs', 'claude-squeeze.mjs']) write(path.join(p.claudeWesh, f), srcText('hooks', f));
       editJson(p.claudeSettings, st, (s, fsx) => {
@@ -677,6 +701,7 @@ function install(o, p) {
     if (cg) {
       const major = opencodeMajor(o, p);
       wireOpencodeCodegraph(p, st, cg.cmd, major, schema);
+      excludeWeshFiles(p, st);
       log(`  codegraph MCP server -> ${p.ocConfig} (OpenCode ${major} format)`);
     } else unwireOpencodeCodegraph(p, st);
     if (wantGuard) editJson(p.ocConfig, st, (c, fsx) => {
@@ -704,6 +729,7 @@ function uninstall(o, p) {
     remove(path.join(p.claudeAgents, 'wesh-scout.md'));
     stripBlock(p.claudeRules, st);
     unwireClaudeCodegraph(p, st);
+    unexcludeWeshFiles(p, st);
     if (fs.existsSync(p.claudeSettings)) editJson(p.claudeSettings, st, (s, fsx) => {
       const ask = fsx.added['permissions.ask'] || [];
       if (Array.isArray(s.permissions?.ask)) s.permissions.ask = s.permissions.ask.filter(r => !ask.includes(r));
@@ -715,6 +741,7 @@ function uninstall(o, p) {
   if (o.target !== 'claude') {
     const st = stO;
     unwireOpencodeCodegraph(p, st);
+    unexcludeWeshFiles(p, st);
     for (const n of all(st)) remove(path.join(p.ocSkills, n));
     remove(path.join(p.ocAgents, 'wesh-scout.md'));
     for (const n of USER_ONLY) remove(path.join(p.ocCommands, `${n}.md`));
