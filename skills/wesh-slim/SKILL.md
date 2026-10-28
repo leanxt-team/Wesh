@@ -1,6 +1,6 @@
 ---
-name: wesh-compress
-description: Rewrite a memory or instruction file (CLAUDE.md, AGENTS.md, rules, notes) to fewer tokens with every fact kept. Use for /wesh-compress <file>.
+name: wesh-slim
+description: Rewrite a memory or instruction file (CLAUDE.md, AGENTS.md, rules, notes) to fewer tokens with every fact kept. Use for /wesh-slim <file>.
 argument-hint: "<file>"
 disable-model-invocation: true
 ---

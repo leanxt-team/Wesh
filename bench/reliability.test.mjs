@@ -75,7 +75,7 @@ test('install both: files land, user content survives, OpenCode is not duplicate
   const cfg = JSON.parse(read(path.join(oc, 'opencode.json')));
   assert.equal(cfg.instructions.length, 1, 'core via instructions: OpenCode 2 has no CLAUDE.md fallback');
   assert.match(read(cfg.instructions[0]), /Smallest complete change/);
-  for (const n of ['wesh', 'wesh-handoff', 'wesh-compress', 'wesh-debt']) assert.equal(cfg.permission.skill[n], 'deny', n);
+  for (const n of ['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt']) assert.equal(cfg.permission.skill[n], 'deny', n);
   assert.equal(cfg.permission.skill['wesh-debug'], undefined);
   const agent = read(path.join(oc, 'agents', 'wesh-scout.md'));
   assert.match(agent, /mode: subagent/);
@@ -90,6 +90,52 @@ test('install both: files land, user content survives, OpenCode is not duplicate
   assert.ok(fs.existsSync(path.join(home, '.claude', 'wesh', 'squeeze.mjs')));
   assert.ok(fs.existsSync(path.join(oc, 'plugins', 'wesh-squeeze.js')));
   assert.ok(fs.existsSync(path.join(oc, 'wesh', 'squeeze.mjs')));
+});
+
+test('an upgrade takes the skills wesh shipped under an old name away', () => {
+  const home = tmp();
+  run(['--home', home, '--target', 'both']);
+  const claudeSkills = path.join(home, '.claude', 'skills');
+  const oc = path.join(home, '.config', 'opencode');
+  const cfgFile = path.join(oc, 'opencode.json');
+  // an older wesh installed these names, and wrote the deny rules itself
+  for (const d of [path.join(claudeSkills, 'wesh'), path.join(oc, 'skills', 'wesh'), path.join(oc, 'skills', 'wesh-compress')]) {
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, 'SKILL.md'), 'old\n');
+  }
+  for (const n of ['wesh', 'wesh-compress']) fs.writeFileSync(path.join(oc, 'commands', `${n}.md`), 'old\n');
+  const cfg = JSON.parse(read(cfgFile));
+  cfg.permission.skill.wesh = 'deny';
+  cfg.permission.skill['wesh-compress'] = 'deny';
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2));
+  for (const dir of [path.join(home, '.claude', 'wesh'), path.join(oc, 'wesh')]) {
+    const f = path.join(dir, 'state.json');
+    const s = JSON.parse(read(f));
+    s.options.skills = [...new Set([...(s.options.skills || []), 'wesh', 'wesh-compress'])];
+    const ocFile = s.files['opencode.json'];
+    if (ocFile) ocFile.added['permission.skill'] = [...new Set([...(ocFile.added['permission.skill'] || []), 'wesh', 'wesh-compress'])];
+    fs.writeFileSync(f, JSON.stringify(s, null, 2));
+  }
+  run(['--home', home, '--target', 'both']);
+  for (const d of [path.join(claudeSkills, 'wesh'), path.join(oc, 'skills', 'wesh'), path.join(oc, 'skills', 'wesh-compress')])
+    assert.ok(!fs.existsSync(d), `${d}: the old skill is gone`);
+  for (const n of ['wesh', 'wesh-compress']) assert.ok(!fs.existsSync(path.join(oc, 'commands', `${n}.md`)), `${n}: the old command is gone`);
+  const after = JSON.parse(read(cfgFile));
+  assert.equal(after.permission.skill.wesh, undefined, 'the deny rule wesh added is gone');
+  assert.equal(after.permission.skill['wesh-compress'], undefined, 'and the other one too');
+  for (const n of ['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt']) assert.equal(after.permission.skill[n], 'deny', n);
+  const st = JSON.parse(read(path.join(oc, 'wesh', 'state.json')));
+  assert.ok(!st.options.skills.includes('wesh') && !st.options.skills.includes('wesh-compress'), 'the old names are off the list');
+});
+
+test('a skill folder of your own with an old wesh name is left alone', () => {
+  const home = tmp();
+  run(['--home', home, '--target', 'both']);
+  const mine = path.join(home, '.claude', 'skills', 'wesh');
+  fs.mkdirSync(mine, { recursive: true });
+  fs.writeFileSync(path.join(mine, 'SKILL.md'), 'mine\n');
+  run(['--home', home, '--target', 'both']);
+  assert.ok(fs.existsSync(path.join(mine, 'SKILL.md')), 'not in the install state: untouched');
 });
 
 test('core lets host/harness reporting instructions win over the voice', () => {
@@ -178,7 +224,7 @@ test('the skills keep their files private and find the markers everywhere', () =
   assert.match(handoff, /~\/\.cache\/wesh/, 'and lands in a private folder');
   const debt = read(path.join(ROOT, 'skills/wesh-debt/SKILL.md'));
   for (const marker of ['<!--', 'REM', ';', '%']) assert.ok(debt.includes(marker), `debt finds ${marker} comments`);
-  assert.match(read(path.join(ROOT, 'skills/wesh/SKILL.md')), /compaction drops them/, 'the level rule says what compaction does');
+  assert.match(read(path.join(ROOT, 'skills/wesh-level/SKILL.md')), /compaction drops them/, 'the level rule says what compaction does');
 });
 
 test('--no-squeeze installs no hook or plugin', () => {
@@ -317,7 +363,7 @@ test('opencode-only: skills copied, core added via instructions, existing config
   assert.match(read(path.join(oc, 'wesh', 'CORE.md')), /Smallest complete change/);
   assert.doesNotMatch(read(path.join(oc, 'wesh', 'CORE.md')), /wesh:begin/);
   for (const n of names) assert.equal(fs.existsSync(path.join(oc, 'skills', n, 'SKILL.md')),
-    !['wesh', 'wesh-handoff', 'wesh-compress', 'wesh-debt'].includes(n), `${n}: only model skills copied`);
+    !['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt'].includes(n), `${n}: only model skills copied`);
   assert.ok(!fs.existsSync(path.join(home, '.claude')), 'claude untouched');
 });
 

@@ -29,7 +29,9 @@ import { forbidden } from './hooks/autoindex.mjs';
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const BEGIN = '<!-- wesh:begin (managed by wesh/install.mjs; edit the level line only) -->';
 const END = '<!-- wesh:end -->';
-const USER_ONLY = ['wesh', 'wesh-handoff', 'wesh-compress', 'wesh-debt'];
+const USER_ONLY = ['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt'];
+// Skills wesh shipped under a name it no longer uses: the new install takes the old ones away.
+const RETIRED = ['wesh', 'wesh-compress'];
 const GUARD_CLAUDE = ['Bash(git push:*)', 'Bash(git reset --hard:*)', 'Bash(git clean:*)', 'Bash(git branch -D:*)',
   'Bash(git checkout -- .:*)', 'Bash(git restore .:*)', 'Bash(rm -rf:*)'];
 const GUARD_OPENCODE = ['git push*', 'git reset --hard*', 'git clean*', 'git branch -D*', 'git checkout -- .*',
@@ -538,6 +540,31 @@ function opencodeCommand(name) {
   return `---\ndescription: "${desc}"\n---\n${body}\n\nArguments: $ARGUMENTS\n`;
 }
 
+// A skill wesh shipped under a name it no longer uses: the new install takes the old one away.
+// A folder of your own with that name (not in the install's state) is left alone.
+function retireSkills(p, stC, stO) {
+  const gone = st => RETIRED.filter(n => (st.options?.skills || []).includes(n));
+  const goneC = gone(stC), goneO = gone(stO);
+  const names = [...new Set([...goneC, ...goneO])];
+  for (const n of names) {
+    remove(path.join(p.claudeSkills, n));
+    remove(path.join(p.ocSkills, n));
+    remove(path.join(p.ocCommands, `${n}.md`));
+  }
+  for (const [st, list] of [[stC, goneC], [stO, goneO]])
+    if (list.length) st.options = { ...st.options, skills: st.options.skills.filter(n => !list.includes(n)) };
+  if (names.length) log(`  retired skills: ${names.join(', ')}`);
+  // The deny rule wesh added for an old name goes with it; a rule you wrote is yours and stays.
+  if (!goneO.length || !fs.existsSync(p.ocConfig)) return;
+  editJson(p.ocConfig, stO, (c, fsx) => {
+    const added = (fsx.added ||= {})['permission.skill'] || [];
+    const dropped = added.filter(n => goneO.includes(n));
+    if (!dropped.length) return;
+    if (isObj(c.permission?.skill)) for (const n of dropped) delete c.permission.skill[n];
+    fsx.added['permission.skill'] = added.filter(n => !dropped.includes(n));
+  }, '');
+}
+
 function install(o, p) {
   const both = o.target === 'both';
   const claudeFallback = both && !process.env.OPENCODE_DISABLE_CLAUDE_CODE;
@@ -568,6 +595,7 @@ function install(o, p) {
   const savedGuard = [stC, stO].map(s => s.options?.guard).find(v => v !== undefined);
   const wantGuard = o.guard ?? savedGuard ?? false;
   for (const st of [stC, stO]) st.options = { ...st.options, squeeze: wantSqueeze, guard: wantGuard };
+  retireSkills(p, stC, stO);
   // The names this install put on disk: uninstall removes them even if a later wesh renames them.
   for (const st of [stC, stO]) st.options = { ...st.options, skills: [...new Set([...(st.options?.skills || []), ...skillNames()])] };
   if (o.target !== 'opencode') {
@@ -658,7 +686,7 @@ function install(o, p) {
     else { unwireOpencodeGuard(p, st); log('  git guard rules removed (--no-guard)'); }
     saveState(p.ocWesh, st);
   }
-  log(`\nDone. Restart Claude Code / OpenCode / OpenChamber. Level: ${o.level}. Try /wesh help.`);
+  log(`\nDone. Restart Claude Code / OpenCode / OpenChamber. Level: ${o.level}. Try /wesh-level help.`);
   if (cg) log('codegraph: on. Each project gets its code graph automatically the first time a session opens it (set WESH_AUTOINDEX=0 to stop that).');
 }
 

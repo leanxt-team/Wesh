@@ -13,7 +13,7 @@ local code graph and an output squeezer, and drops everything that costs tokens 
   migration safety). Tests are added when you ask, or for risky logic (money, security, parsing, data writes).
 - **Talks like a caveman.** The always-on rules are written caveman-style and the default voice is caveman: answer
   first, no filler, exact numbers, code and paths. Full sentences for security warnings, irreversible actions,
-  questions to you and anything written to files. `/wesh lite` switches to normal prose.
+  questions to you and anything written to files. `/wesh-level lite` switches to normal prose.
 - **Plans, debugs, tests and reviews like Matt Pocock, on demand.** `wesh-plan`, `wesh-debug`, `wesh-tdd`,
   `wesh-refactor` and `wesh-review` load only when the situation calls for them, so plain tasks stay cheap.
 - **Searches with a code graph.** On repositories of 200 tracked files or more, each project gets a local
@@ -28,15 +28,15 @@ local code graph and an output squeezer, and drops everything that costs tokens 
 | | Name | From | Purpose |
 |---|---|---|---|
 | always on | core rules (`core/CORE.md`, ~600 tokens; ~130 more with the code graph rules) | ponytail + caveman | scope, smallest complete change, never-cut list, token thrift, voice levels |
-| auto | `wesh-plan` | grilling + to-spec | questions with recommended answers, then a short spec |
 | auto | `wesh-debug` | diagnosing-bugs | reproduce-first loop, ranked hypotheses, fix at the owning layer |
 | auto | `wesh-tdd` | tdd | red-to-green slices at public seams, when you ask for TDD |
 | auto | `wesh-refactor` | safe-refactor + migration | behavior proven before and after, rollback for migrations |
 | auto | `wesh-review` | ponytail review + caveman-review | diff, PR or repo review with numbered findings |
 | auto | `wesh-commit` | caveman-commit | Conventional Commits message |
-| `/` only | `/wesh` | ponytail levels | `lite` / `full` / `ultra` / `off` / `help` |
+| `/` only | `/wesh-level` | ponytail levels | `lite` / `full` / `ultra` / `off` / `help` |
+| `/` only | `/wesh-plan` | grilling + to-spec | questions with recommended answers, then a short spec |
 | `/` only | `/wesh-handoff` | handoff | compress a long session into a handoff file for a fresh one |
-| `/` only | `/wesh-compress` | caveman-compress | shrink `CLAUDE.md` / `AGENTS.md`, every fact kept |
+| `/` only | `/wesh-slim` | caveman-compress | shrink `CLAUDE.md` / `AGENTS.md`, every fact kept |
 | `/` only | `/wesh-debt` | ponytail-debt | ledger of `shortcut:` comments |
 | subagent | `wesh-scout` | caveman-explore | cheap read-only locator, `path:line` output |
 | hook | squeeze | caveman "read less" | trims long build/test/install output |
@@ -144,9 +144,9 @@ output, so failing runs reach the model untrimmed.
 
 ## Use
 
-Just work as usual. `/wesh help` prints the map; `/wesh lite` for normal prose, `/wesh ultra` for even fewer words
-and scope push-back, `/wesh off` to pause it. Say "plan", "review", "debug" or "TDD" to pull in those skills. Long
-session? `/wesh-handoff`, then continue in a fresh one.
+Just work as usual. `/wesh-level help` prints the map; `/wesh-level lite` for normal prose, `/wesh-level ultra` for
+even fewer words and scope push-back, `/wesh-level off` to pause it. Say "review", "debug" or "TDD" to pull in those
+skills; `/wesh-plan` for a fuzzy or large request. Long session? `/wesh-handoff`, then continue in a fresh one.
 
 ## Uninstall
 

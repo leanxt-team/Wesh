@@ -1,6 +1,7 @@
 ---
 name: wesh-plan
-description: Turn a fuzzy or large request into agreed decisions and a short spec before coding. Use for "plan", "spec", "grill me".
+description: Turn a fuzzy or large request into agreed decisions and a short spec before coding. Use for /wesh-plan.
+disable-model-invocation: true
 ---
 
 Goal: shared understanding in the fewest rounds, then a spec an agent can build from. Building the wrong thing is the most expensive token spend.

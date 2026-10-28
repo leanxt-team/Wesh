@@ -165,8 +165,8 @@ const checks = [
   ['mock received requests (no real model used)', seen.length > 0],
   ['core rules loaded from the installed CLAUDE.md', /lazy senior dev, pay every token/.test(sandboxMemory)],
   ['installed level is the one in effect', /Level: `ultra`/.test(sandboxMemory)],
-  ['6 auto skills listed', ['wesh-commit', 'wesh-debug', 'wesh-plan', 'wesh-refactor', 'wesh-review', 'wesh-tdd'].every(listed)],
-  ['4 slash-only skills not offered to the model', !['wesh', 'wesh-handoff', 'wesh-compress', 'wesh-debt'].some(listed)],
+  ['5 auto skills listed', ['wesh-commit', 'wesh-debug', 'wesh-refactor', 'wesh-review', 'wesh-tdd'].every(listed)],
+  ['5 slash-only skills not offered to the model', !['wesh-level', 'wesh-plan', 'wesh-handoff', 'wesh-slim', 'wesh-debt'].some(listed)],
   // In user scope Claude Code on Windows reads agents from the OS home's ~/.claude/agents, not CLAUDE_CONFIG_DIR (skills it reads from the sandbox).
   scoutViaOsHome ? ['wesh-scout offered as subagent (Windows user scope: read from the real ~/.claude/agents)', true]
     : ['wesh-scout offered as subagent', listed('wesh-scout')],
