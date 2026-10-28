@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stageSource } from './lib.mjs';
 
@@ -54,7 +54,11 @@ fs.writeFileSync(path.join(proj, 'gen.js'), "for (let i = 0; i < 500; i++) conso
 fs.mkdirSync(path.join(proj, 'src'), { recursive: true });
 fs.writeFileSync(path.join(proj, 'src', 'money.js'), '// Split cents into n shares.\nexport function splitCents(total, n) {\n  const share = Math.round(total / n);\n  return Array.from({ length: n }, () => share);\n}\n');
 fs.writeFileSync(path.join(proj, 'src', 'invoice.js'), "import { splitCents } from './money.js';\nexport const invoiceLines = (t, payers) => splitCents(t, payers.length).map((cents, i) => ({ payer: payers[i], cents }));\n");
-const indexReady = async () => { for (let i = 0; i < 1200 && !fs.existsSync(path.join(proj, '.codegraph', 'codegraph.db')); i++) await new Promise(r => setTimeout(r, 100)); };
+// The background build writes codegraph.db before it has parsed the files: wait until codegraph itself reports the
+// index complete (2 minutes at most), so the scripted model never explores a half-built graph.
+const indexState = () => new Promise(r => execFile(cgBin, ['status', '--json'], { cwd: proj, encoding: 'utf8', timeout: 30000, shell: process.platform === 'win32' },
+  (e, out) => { try { r(JSON.parse(out).index?.state || ''); } catch { r(''); } }));
+const indexReady = async () => { for (const t = Date.now(); Date.now() - t < 120000 && await indexState() !== 'complete';) await new Promise(r => setTimeout(r, 250)); };
 
 // Mock Anthropic Messages API. Script: Bash `npm test` (passes, long), Bash `npm run test:fail` (fails, long),
 // codegraph_explore once it is offered and the index exists, then "done".
