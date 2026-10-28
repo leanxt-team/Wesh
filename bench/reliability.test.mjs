@@ -138,6 +138,19 @@ test('a skill folder of your own with an old wesh name is left alone', () => {
   assert.ok(fs.existsSync(path.join(mine, 'SKILL.md')), 'not in the install state: untouched');
 });
 
+test('an OpenCode copy of a skill that became slash-only is removed on upgrade', () => {
+  const home = tmp();
+  run(['--home', home, '--target', 'opencode']);
+  const oc = path.join(home, '.config', 'opencode');
+  // a copy an older wesh made before wesh-plan became slash-only
+  const stale = path.join(oc, 'skills', 'wesh-plan');
+  fs.mkdirSync(stale, { recursive: true });
+  fs.writeFileSync(path.join(stale, 'SKILL.md'), 'old copy\n');
+  run(['--home', home, '--target', 'opencode']);
+  assert.ok(!fs.existsSync(stale), 'the stale copy is gone');
+  assert.ok(fs.existsSync(path.join(oc, 'commands', 'wesh-plan.md')), 'the command carries the skill now');
+});
+
 test('core lets host/harness reporting instructions win over the voice', () => {
   assert.match(read(path.join(ROOT, 'core', 'CORE.md')), /harness[^\n]*(win over|beat) this voice/i);
 });

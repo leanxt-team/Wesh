@@ -1,6 +1,6 @@
 ---
 name: wesh-level
-description: Switch wesh level for this session (lite, full, ultra, off) or show the skill map. Use for /wesh-level, "wesh ultra", "be lazier", "normal mode".
+description: Switch wesh level for this session (lite, full, ultra, off) or show the skill map. Use for /wesh-level.
 argument-hint: "[lite|full|ultra|off|help]"
 disable-model-invocation: true
 ---

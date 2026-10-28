@@ -14,8 +14,8 @@ local code graph and an output squeezer, and drops everything that costs tokens 
 - **Talks like a caveman.** The always-on rules are written caveman-style and the default voice is caveman: answer
   first, no filler, exact numbers, code and paths. Full sentences for security warnings, irreversible actions,
   questions to you and anything written to files. `/wesh-level lite` switches to normal prose.
-- **Plans, debugs, tests and reviews like Matt Pocock, on demand.** `wesh-plan`, `wesh-debug`, `wesh-tdd`,
-  `wesh-refactor` and `wesh-review` load only when the situation calls for them, so plain tasks stay cheap.
+- **Debugs, tests and reviews like Matt Pocock, on demand.** `wesh-debug`, `wesh-tdd`, `wesh-refactor` and
+  `wesh-review` load only when the situation calls for them, so plain tasks stay cheap.
 - **Searches with a code graph.** On repositories of 200 tracked files or more, each project gets a local
   [codegraph](https://github.com/colbymchenry/codegraph) index, built and kept in sync automatically. Cross-file
   questions go to `codegraph_explore` first; grep remains for exact strings, config and confirming that something is

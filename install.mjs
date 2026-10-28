@@ -630,6 +630,8 @@ function install(o, p) {
       for (const n of skillNames()) if (fs.existsSync(path.join(p.ocSkills, n, 'SKILL.md'))) remove(path.join(p.ocSkills, n));
       log(`  skills: OpenCode reads ${p.claudeSkills} directly; not duplicated`);
     } else {
+      // A copy an older wesh made before the skill became slash-only (the command carries it now).
+      for (const n of USER_ONLY) remove(path.join(p.ocSkills, n));
       for (const n of modelSkills) copyDir(path.join(SRC, 'skills', n), path.join(p.ocSkills, n));
       log(`  ${modelSkills.length} skills -> ${p.ocSkills}`);
     }
