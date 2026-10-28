@@ -64,7 +64,8 @@ test('install both: files land, user content survives, OpenCode is not duplicate
   const home = tmp();
   fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# my rules\nKeep me.\n');
-  run(['--home', home, '--target', 'both']);
+  // OpenCode 2 explicitly: an OpenCode 1 on PATH would be detected and change where the core rules go.
+  run(['--home', home, '--target', 'both', '--opencode-version', '2']);
   const md = read(path.join(home, '.claude', 'CLAUDE.md'));
   assert.match(md, /^# my rules\nKeep me\./);
   assert.match(md, /wesh:begin[\s\S]*Smallest complete change[\s\S]*wesh:end/);
