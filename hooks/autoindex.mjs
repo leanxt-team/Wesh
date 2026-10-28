@@ -260,7 +260,7 @@ if (process.argv[1] && same(process.argv[1], THIS)) {
 
 export const NOTE = 'wesh: building this repo\'s code graph in the background (about 1 minute per 1,000 source files). '
   + 'Until it exists, use grep/Read. `codegraph_explore` works as soon as it is built, no restart needed; '
-  + 'until the server has found it, pass projectPath=<project root>.';
+  + 'until the server has found it, or outside the session\'s start directory (a git worktree), pass projectPath=<project root>.';
 export const TOO_SMALL = 'wesh: small repository, no code graph: use grep/Read (cheaper at this size).';
 export const TOO_BIG = 'wesh: this repository is large, so its code graph was not built automatically; use grep/Read. '
   + 'Tell the user once: to have one built, start the agent with WESH_AUTOINDEX_FORCE=1 set.';
